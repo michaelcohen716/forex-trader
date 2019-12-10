@@ -1,8 +1,11 @@
 const HDWalletProvider = require('truffle-hdwallet-provider');
 const walletFile = require('./wallet.json');
 
+const fullPathBuildDirectory = `${__dirname}/src/contracts`;
+
 module.exports = {
   // network: "test",
+  contracts_build_directory: fullPathBuildDirectory,
   networks: {
     // development: {
     //   host: "127.0.0.1",

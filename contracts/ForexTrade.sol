@@ -1,46 +1,44 @@
 pragma solidity 0.4.24;
 
 import "chainlink/contracts/ChainlinkClient.sol";
-import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 interface ForexTradeFactoryContract {
     function registerCounterparty();
 }
 
-/**
- * @title MyContract is an example contract which requests data from
- * the Chainlink network
- * @dev This contract is designed to work on multiple networks, including
- * local test networks
- */
-contract ForexTrade is ChainlinkClient, Ownable {
-    // solium-disable-next-line zeppelin/no-arithmetic-operations
+interface ERC20 {
+  function balanceOf(address) returns(uint);
+}
+
+// add safemath
+contract ForexTrade is ChainlinkClient {
     uint256 private constant ORACLE_PAYMENT = LINK / 10;
     int256 public rate;
 
+    uint256 LEVERAGE = 10;
+
+    address LINK_TOKEN = 0x4a3FBbB385b5eFEB4BC84a25AaADcD644Bd09721;
+
     /* Core */
     string[2] currencies; // ["USD", "EUR"]
-    address[2] counterparties; // ["Alice", "Bob"]
+    address[2] counterparties; // ["0xAlice", "0xBob"]
     // Alice is betting on USD gaining value
 
     bytes32 jobId;
     int256 times = 10000; // multiply oracle result by 10,000: 1.345% = 13450;
     bool ratesInitiated = false;
 
-    uint256[2] accountCollateral; // initial values ~= notional / 5
-    uint256[2] accountReceipts; // initial values = 0 // still need this??
+    uint256[2] accountCollateral; // initial values >= notional / LEVERAGE
 
     uint256 notional; // wei
     uint256 tradePeriodStart; // timestamp
     uint256 tradePeriodEnd; // timestamp
 
-    /**
-   * @notice Deploy the contract with a specified address for the LINK
-   * and Oracle contract addresses
-   * @dev Sets the storage for the specified addresses
-   * @param _link The address of the LINK token contract
-   * @param _oracle The address of the Oracle contract
-   */
+    event TradeInitiated(address indexed initiator);
+    event TradeAccepted(address indexed acceptor);
+    event TradeRepriced(address indexed sender, int oldRate, int newRate);
+    event TradeLiquidated(address indexed liquidated, uint timestamp);
+
     constructor(
         address _link,
         address _oracle,
@@ -56,34 +54,20 @@ contract ForexTrade is ChainlinkClient, Ownable {
         counterparties[0] = tx.origin;
         jobId = _jobId;
 
-        ForexTradeFactoryContract factoryContract = ForexTradeFactoryContract(_factoryAddress);
+        ForexTradeFactoryContract factoryContract = ForexTradeFactoryContract(
+            _factoryAddress
+        );
     }
 
     /* Chainlink functions */
-
-    /**
-   * @notice Returns the address of the LINK token
-   * @dev This is the public implementation for chainlinkTokenAddress, which is
-   * an internal method of the ChainlinkClient contract
-   */
     function getChainlinkToken() public view returns (address) {
         return chainlinkTokenAddress();
     }
 
-    /**
-   * @notice Returns the address of the Oracle contract
-   * @dev This is the public implementation for chainlinkOracleAddress, which is
-   * an internal method of the ChainlinkClient contract
-   */
     function getOracle() public view returns (address) {
         return chainlinkOracleAddress();
     }
 
-    /**
-   * @notice Creates a request to the stored Oracle contract address
-   * @dev Calls createRequestTo using the stored Oracle contract address
-   * for the first parameter
-   */
     function createRequest() public returns (bytes32) {
         return
             createRequestTo(
@@ -95,16 +79,6 @@ contract ForexTrade is ChainlinkClient, Ownable {
             );
     }
 
-    /**
-   * @notice Creates a request to the specified Oracle contract address
-   * @dev This function ignores the stored Oracle contract address and
-   * will instead send the request to the address specified
-   * @param _oracle The Oracle contract address to send the request to
-   * @param _jobId The bytes32 JobID to be executed
-   * @param _baseCurrency base currency
-   * @param _symbol pair currency
-   * @param _times The number to multiply the result by
-   */
     function createRequestTo(
         address _oracle,
         bytes32 _jobId,
@@ -128,13 +102,6 @@ contract ForexTrade is ChainlinkClient, Ownable {
         return string(abi.encodePacked("rates.", currencies[1]));
     }
 
-    /**
-   * @notice The fulfill method from requests created by this contract
-   * @dev The recordChainlinkFulfillment protects this function from being called
-   * by anyone other than the oracle address that the request was sent to
-   * @param _requestId The ID that was generated for the request
-   * @param _rate The answer provided by the oracle
-   */
     function fulfill(bytes32 _requestId, int256 _rate)
         public
         recordChainlinkFulfillment(_requestId)
@@ -149,6 +116,7 @@ contract ForexTrade is ChainlinkClient, Ownable {
     }
 
     function runRepricing(int256 oldRate, int256 newRate) private {
+        // EXAMPLE:
         // currencies = ["USD", "EUR"]
         // counterparties = ["addr0", "addr1"]
         // notional = 1,000,000
@@ -160,12 +128,16 @@ contract ForexTrade is ChainlinkClient, Ownable {
         uint256 changeInValue;
 
         if (oldRate < newRate) {
-            // currencies[0] is the currency that appreciated
+            // currencies[0] is the currency that appreciated in this condition
             changeInRate = uint256(newRate) - uint256(oldRate); // 9200 - 9000 = 200
             changeInValue = (notional * changeInRate) / uint256(times); // 1000000 * 200 / 10000 = 20000
             accountCollateral[0] = accountCollateral[0] + changeInValue;
             accountCollateral[1] = accountCollateral[1] - changeInValue;
             /* accountCollateral post TX = [220000, 180000] */
+
+            if(accountCollateral[1] < notional / (LEVERAGE * 2)){ // less than 5%
+              liquidate(1);
+            }
         } else if (oldRate == newRate) {
             return;
         } else {
@@ -173,48 +145,45 @@ contract ForexTrade is ChainlinkClient, Ownable {
             changeInValue = (notional * changeInRate) / uint256(times);
             accountCollateral[0] = accountCollateral[0] - changeInValue;
             accountCollateral[1] = accountCollateral[1] + changeInValue;
+
+            if(accountCollateral[0] < notional / (LEVERAGE * 2)){
+              liquidate(0);
+            }
         }
 
-        // add liquidation condition for less than 15% collateralized (initial = 20%)
-
+        emit TradeRepriced(msg.sender, oldRate, newRate);
     }
 
-    /**
-   * @notice Call this method if no response is received within 5 minutes
-   * @param _requestId The ID that was generated for the request to cancel
-   * @param _payment The payment specified for the request to cancel
-   * @param _callbackFunctionId The bytes4 callback function ID specified for
-   * the request to cancel
-   * @param _expiration The expiration generated for the request to cancel
-   */
-    function cancelRequest(
-        bytes32 _requestId,
-        uint256 _payment,
-        bytes4 _callbackFunctionId,
-        uint256 _expiration
-    ) public onlyOwner {
-        cancelChainlinkRequest(
-            _requestId,
-            _payment,
-            _callbackFunctionId,
-            _expiration
-        );
-    }
+    function liquidate(uint liquidatedAccount) private {
+        uint collateralValue;
 
-    /* Core functions --> one contract per swap */
+        if(liquidatedAccount == 1){
+          collateralValue = accountCollateral[1];
+          accountCollateral[1] = 0;
+          accountCollateral[0] = accountCollateral[0] + collateralValue;
+        } else {
+          collateralValue = accountCollateral[0];
+          accountCollateral[0] = 0;
+          accountCollateral[1] = accountCollateral[1] + collateralValue;
+        }
+
+        tradePeriodEnd = block.timestamp;
+        TradeLiquidated(counterparties[liquidatedAccount], block.timestamp);
+    }
 
     function initiateTrade(uint256 _notional, uint256 _tradePeriodEnd)
         public
         payable
         isNotInitiated
     {
-        require(msg.value > _notional / 5, "Insufficient collateral"); // initiate at max 5x leverage
+        require(msg.value >= _notional / LEVERAGE, "Insufficient collateral");
 
         counterparties[0] = msg.sender;
         accountCollateral[0] = msg.value;
         notional = _notional;
 
         tradePeriodEnd = _tradePeriodEnd;
+        emit TradeInitiated(msg.sender);
     }
 
     modifier isNotInitiated() {
@@ -229,12 +198,14 @@ contract ForexTrade is ChainlinkClient, Ownable {
 
     // Contract must be funded with LINK for this function to run
     function acceptTrade() public payable isInitiated {
-        require(msg.value > notional / 5, "Insufficient collateral");
+        require(msg.value >= notional / LEVERAGE, "Insufficient collateral");
 
         counterparties[1] = msg.sender;
         accountCollateral[1] = msg.value;
 
         tradePeriodStart = block.timestamp;
+
+        emit TradeAccepted(msg.sender);
         updateRates();
     }
 
@@ -242,5 +213,36 @@ contract ForexTrade is ChainlinkClient, Ownable {
     function updateRates() public {
         require(tradePeriodStart > 0, "Trade yet to begin");
         createRequest();
+    }
+
+    function getNotional() view returns (uint256 _notional) {
+        return notional;
+    }
+
+    function getTrade()
+        view
+        returns (
+            uint256 _notional,
+            string _currencyA,
+            string _currencyB,
+            address[2] _counterparties,
+            uint256 _tradePeriodEnd,
+            int256 _rate,
+            uint256[2] _accountCollateral
+        )
+    {
+        return (
+            notional,
+            currencies[0],
+            currencies[1],
+            counterparties,
+            tradePeriodEnd,
+            rate,
+            accountCollateral
+        );
+    }
+
+    function getLinkBalance() view returns (uint _balance){
+      return ERC20(LINK_TOKEN).balanceOf(address(this));
     }
 }
