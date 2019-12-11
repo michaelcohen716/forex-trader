@@ -2,16 +2,10 @@
 
 ForexTrader provides permissionless access to leveraged, p2p forex trading.
 
-<style>
-    img {
-        width: 50%;
-        margin: 10px;
-    }
 
-</style>
+<img src="./src/assets/honeycombwhite.png" width="50%" margin="20px">
+<img src="./src/assets/chainlink.svg" width="50%"  margin="20px">
 
-![honeycomb](./src/assets/honeycombwhite.png)
-![chainlink](./src/assets/chainlink.svg)
 
 
 ForexTrader uses the Chainlink/Honeycomb oracle system and the Fixer API to track changes in exchange rates on-chain.
