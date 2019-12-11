@@ -1,7 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Headline from "../common/Headline";
+import Loading from "../common/Loading";
+import InitiateTrade from "./InitiateTrade";
+import SubmitButton from "./SubmitButton";
 import Select from "react-select";
+import {
+  createTrade,
+  FTFContractEthers
+} from "../../services/forexTradeFactory";
+import Web3 from "web3";
 import "./new.css";
+
+let web3;
+
+if (window.ethereum) {
+  web3 = new Web3(window.ethereum);
+}
 
 const TRADE_OPTIONS = ["Long", "Short"];
 const CURRENCY_OPTIONS = ["USD", "EUR", "JPY", "GBP"];
@@ -29,12 +43,17 @@ const valueOptions = VALUE_OPTIONS.map(o => {
 });
 
 function New() {
+  const [txProcessing, toggleTxProcessing] = useState(false);
+  const [showConfirm, toggleShowConfirm] = useState(false);
+
   const [tradeOption, setTradeOption] = useState();
   const [currencyOption, setCurrencyOption] = useState();
   const [currencyOption2, setCurrencyOption2] = useState();
   const [valueOption, setValueOption] = useState();
 
   const [formFields, toggleFormFields] = useState([false, false, false, false]);
+
+  const [tradeAddress, setTradeAddress] = useState("")
 
   const setFormFields = idx => {
     const fields = [...formFields];
@@ -62,7 +81,40 @@ function New() {
     setFormFields(3);
   };
 
-  console.log("formfields", formFields);
+  const submitTransaction = async () => {
+    const firstCurr =
+      tradeOption === TRADE_OPTIONS[0] ? currencyOption : currencyOption2;
+    const secondCurr =
+      tradeOption === TRADE_OPTIONS[0] ? currencyOption2 : currencyOption;
+
+    toggleTxProcessing(true);
+
+    const contr = await FTFContractEthers();
+    contr.on("TradeCreated", (oldValue, newValue, event) => {
+      console.log("TRADE CREATED");
+      toggleTxProcessing(false);
+      toggleShowConfirm(true);
+      setTradeAddress(event.args.tradeContract)
+    });
+
+    await createTrade(firstCurr.value, secondCurr.value);
+  };
+
+  if(txProcessing){
+    return <Loading />
+  }
+
+  if (showConfirm) {
+    return (
+      <InitiateTrade
+        notional={"1"}
+        trade={"long"}
+        currencyA={"USD"}
+        currencyB={"EUR"}
+        tradeAddress={tradeAddress}
+      />
+    );
+  }
 
   return (
     <div className="d-flex flex-column">
@@ -125,16 +177,15 @@ function New() {
       >
         <div className="d-flex">
           <div className="decision-point my-auto">
-            I will submit {valueOption ? Number(valueOption.value / 10) : 0} ETH as collateral.
+            I will submit {valueOption ? Number(valueOption.value / 10) : 0} ETH
+            as collateral in the next step.
           </div>
         </div>
       </div>
-      <button
-        className="submit-button mx-auto mt-4 p-2"
+      <SubmitButton
+        onClick={submitTransaction}
         disabled={formFields.filter(ff => ff === false).length}
-      >
-        Submit
-      </button>
+      />
     </div>
   );
 }
