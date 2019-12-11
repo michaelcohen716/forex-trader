@@ -12,7 +12,7 @@ if (window.ethereum) {
 }
 
 export const FOREX_TRADE_FACTORY_ADDRESS =
-  "0x1444E5f576878752234384142E138577e1d8Dfda"; // ropsten
+  "0x05b568B5ef06dfe28cD8130d2D6e8B8e4aF4453c"; // ropsten
 
 /* ForexTradeFactory Contract */
 export async function FTFContract() {

@@ -36,3 +36,7 @@ td {
 .inactive-transfer {
     color: gray !important;
 }
+
+.trade-table {
+    overflow-y: scroll;
+}

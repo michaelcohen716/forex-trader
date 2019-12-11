@@ -27,6 +27,7 @@ contract ForexTrade is ChainlinkClient {
     bytes32 jobId;
     int256 times = 10000; // multiply oracle result by 10,000: 1.345% = 13450;
     bool ratesInitiated = false;
+    int initialRate;
 
     uint256[2] accountCollateral; // initial values >= notional / LEVERAGE
 
@@ -38,6 +39,9 @@ contract ForexTrade is ChainlinkClient {
     event TradeAccepted(address indexed acceptor);
     event TradeRepriced(address indexed sender, int oldRate, int newRate);
     event TradeLiquidated(address indexed liquidated, uint timestamp);
+
+    // ForexTradeFactoryContract factoryContract;
+    address factoryAddress;
 
     constructor(
         address _link,
@@ -54,9 +58,10 @@ contract ForexTrade is ChainlinkClient {
         counterparties[0] = tx.origin;
         jobId = _jobId;
 
-        ForexTradeFactoryContract factoryContract = ForexTradeFactoryContract(
-            _factoryAddress
-        );
+        factoryAddress = _factoryAddress;
+        // factoryContract = ForexTradeFactoryContract(
+        //     _factoryAddress
+        // );
     }
 
     /* Chainlink functions */
@@ -107,6 +112,7 @@ contract ForexTrade is ChainlinkClient {
         recordChainlinkFulfillment(_requestId)
     {
         if (!ratesInitiated) {
+            initialRate = _rate;
             ratesInitiated = true;
         } else {
             // (oldRate, newRate)
@@ -204,6 +210,7 @@ contract ForexTrade is ChainlinkClient {
         accountCollateral[1] = msg.value;
 
         tradePeriodStart = block.timestamp;
+        ForexTradeFactoryContract(factoryAddress).registerCounterparty();
 
         emit TradeAccepted(msg.sender);
         updateRates();
@@ -227,7 +234,9 @@ contract ForexTrade is ChainlinkClient {
             string _currencyB,
             address[2] _counterparties,
             uint256 _tradePeriodEnd,
+            uint256 _tradePeriodStart,
             int256 _rate,
+            int256 _initialRate,
             uint256[2] _accountCollateral
         )
     {
@@ -237,7 +246,9 @@ contract ForexTrade is ChainlinkClient {
             currencies[1],
             counterparties,
             tradePeriodEnd,
+            tradePeriodStart,
             rate,
+            initialRate,
             accountCollateral
         );
     }

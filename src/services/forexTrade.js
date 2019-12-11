@@ -40,8 +40,7 @@ export async function acceptTrade(address) {
 
   await contr.methods.acceptTrade().send({
     from: web3.eth.accounts.givenProvider.selectedAddress,
-    value: notional / LEVERAGE * 2
-    //   value: web3.utils.toWei(String(notionalInEth / LEVERAGE), "ether")
+    value: notional / LEVERAGE
   });
 }
 

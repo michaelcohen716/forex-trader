@@ -23,7 +23,8 @@ function Trade() {
         const addr = web3.eth.accounts.givenProvider.selectedAddress;
         const trades = await getTradesByAddress(addr);
         console.log("trades", trades);
-        setMyTrades(trades);
+
+        setMyTrades(trades.reverse());
         toggleLoading(false);
         // const pastEvents = await getPastTradeEvents(addr)
         // console.log('pastEvents', pastEvents);
@@ -37,10 +38,10 @@ function Trade() {
   }
 
   return (
-    <div className="d-flex flex-column">
+    <div className="d-flex flex-column trade-table">
       <Headline text="Trade" />
       <AcceptTrade />
-      <TradeTable />
+      <TradeTable trades={myTrades} />
     </div>
   );
 }

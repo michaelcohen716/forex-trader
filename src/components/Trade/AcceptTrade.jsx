@@ -36,17 +36,8 @@ function AcceptTrade() {
   const fundLink = async () => {
     if (isValid()) {
       toggleTransferProcessing(true);
-
-      const contr = await LinkContractEthers();
-      contr.on(
-        "Transfer",
-        { from: web3.eth.accounts.givenProvider.selectedAddress },
-        (oldValue, newValue, event) => {
-          toggleTransferProcessing(false);
-        }
-      );
       setTimeout(() => {
-        toggleTxProcessing(false);
+        toggleTransferProcessing(false);
       }, 15000);
 
       await transferLink(tradeAddress);
