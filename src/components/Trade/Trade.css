@@ -40,3 +40,9 @@ td {
 .trade-table {
     overflow-y: scroll;
 }
+
+.flip-img {
+  height: 30px;
+  width: auto;
+  cursor: pointer;
+}

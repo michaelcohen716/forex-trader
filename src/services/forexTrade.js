@@ -51,3 +51,10 @@ export async function getTrade(address) {
   console.log("trade", trade);
   return trade;
 }
+
+export async function updateRates(address) {
+  const contr = await FTContract(address);
+  await contr.methods.updateRates().send({
+      from: web3.eth.accounts.givenProvider.selectedAddress
+  });
+}

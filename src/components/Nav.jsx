@@ -7,13 +7,13 @@ function Nav({ history }) {
   return (
     <nav className="d-flex justify-content-around nav px-4 py-3">
       <div
-        className={`nav-item ${currPath === "/trade" && "nav-item-inactive"}`}
-        onClick={() => history.push("/")}
+        className={`nav-item ${currPath !== "/new" && "nav-item-inactive"}`}
+        onClick={() => history.push("/new")}
       >
         New
       </div>
       <div
-        className={`nav-item ${currPath === "/" && "nav-item-inactive"}`}
+        className={`nav-item ${currPath !== "/trade" && "nav-item-inactive"}`}
         onClick={() => history.push("/trade")}
       >
         Trade

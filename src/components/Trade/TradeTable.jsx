@@ -17,13 +17,11 @@ const newTrade = () => {
     initialRate: "",
     pair: "EUR/USD",
     latestRate: "0.934",
-    initiated: "No"
+    active: "No"
   };
 };
 
-const buildData = async () => {};
-
-const sanitizeTradeData = data => {
+const sanitizeTradeData = (data, addr) => {
   const {
     _accountCollateral,
     _counterparties,
@@ -57,16 +55,15 @@ const sanitizeTradeData = data => {
   const calcRate = str => Number(str) / 10000;
 
   return {
-    address:
-      counterpartyAddress.slice(0, 6) + "..." + counterpartyAddress.slice(36),
+    address: addr,
+    //   counterpartyAddress.slice(0, 6) + "..." + counterpartyAddress.slice(36),
     notional: notInitiated
       ? "n/a"
       : String(Number(_notional) / 10 ** 18) + " ETH",
     initialRate: notInitiated ? "n/a" : calcRate(_initialRate),
-    // originated: notInitiated ? "n/a" :
     pair: `${_currencyA}/${_currencyB}`,
     latestRate: calcRate(_rate),
-    initiated: notInitiated ? "No" : "Yes"
+    active: calcRate(_initialRate) === 0 ? "No" : "Yes"
   };
 };
 
@@ -81,7 +78,7 @@ function TradeTable({ trades }) {
       const allTrades = [];
       for (var i = 0; i < trades.length; i++) {
         let trade = await getTrade(trades[i]);
-        trade = sanitizeTradeData(trade);
+        trade = sanitizeTradeData(trade, trades[i]);
         console.log("trade", trade);
         allTrades.push(trade);
       }
@@ -116,8 +113,8 @@ function TradeTable({ trades }) {
           accessor: "latestRate"
         },
         {
-          Header: "Initiated",
-          accessor: "initiated"
+          Header: "Active",
+          accessor: "active"
         }
       ]
     }

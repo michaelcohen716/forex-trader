@@ -2,13 +2,15 @@ import React, { useState } from "react";
 import {
   acceptTrade,
   FTContractEthers,
+  updateRates,
   getTrade
 } from "../../services/forexTrade";
 import { transferLink, LinkContractEthers } from "../../services/link";
 import { isValidAddress } from "../../utils";
 import Loading from "../common/Loading";
-import "./Trade.css";
 import Web3 from "web3";
+import flip from "../../assets/flip.png";
+import "./Trade.css";
 
 let web3;
 
@@ -21,6 +23,8 @@ function AcceptTrade() {
   const [txProcessing, toggleTxProcessing] = useState(false);
   const [transferProcessing, toggleTransferProcessing] = useState(false);
 
+  const [acceptView, toggleAcceptView] = useState(true);
+
   const accept = async e => {
     e.preventDefault();
     toggleTxProcessing(true);
@@ -29,8 +33,20 @@ function AcceptTrade() {
     contr.on("TradeAccepted", (oldValue, newValue, event) => {
       toggleTxProcessing(false); // event not catchin
     });
-    //   const addr = "0x95368cbf23DaF71878F0b27F00DBe49eE52137F6";
+
     await acceptTrade(tradeAddress);
+  };
+
+  const update = async e => {
+    e.preventDefault();
+    toggleTxProcessing(true);
+
+    const contr = await FTContractEthers(tradeAddress);
+    contr.on("TradeRepriced", (oldVal, newVal, event) => {
+      toggleTxProcessing(false);
+    });
+
+    await updateRates(tradeAddress);
   };
 
   const fundLink = async () => {
@@ -63,14 +79,19 @@ function AcceptTrade() {
         />
         <button
           className="accept-button ml-2"
-          onClick={accept}
+          onClick={acceptView ? accept : update}
           disabled={!isValid()}
         >
-          Accept Trade
+          {acceptView ? "Accept Trade" : "Update Price"}
         </button>
+        <img
+          src={flip}
+          className="img-fluid flip-img my-auto ml-2"
+          onClick={() => toggleAcceptView(!acceptView)}
+        />
       </form>
       {transferProcessing ? (
-        <div className="transfer-text">Transfer Processing...</div>
+        <div className="transfer-text">Processing...</div>
       ) : (
         <div
           className={`transfer-text ${!isValid() && "inactive-transfer"}`}
