@@ -3,7 +3,7 @@
 ForexTrader provides permissionless access to leveraged, p2p forex trading.
 
 
-<img src="./src/assets/honeycombwhite.png" width="50%" margin="20px">
+<img src="./src/assets/honeycombwhite.png" width="50%" margin="10px">
 <img src="./src/assets/chainlink.png" width="50%"  marginLeft="-9px">
 
 
