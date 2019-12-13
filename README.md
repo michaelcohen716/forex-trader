@@ -7,7 +7,7 @@
 </div>
 
 
-
+*Only available on Ropsten*
 
 ForexTrader uses the Chainlink/Honeycomb oracle system and the Fixer API to track changes in exchange rates on-chain.
 
